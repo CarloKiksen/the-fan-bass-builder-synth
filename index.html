@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Fan Bass Builder</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts: VT323 for the pixel text -->
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --plastic-bg: #e6e4d5; /* Beige */
+            --plastic-shadow-light: #fbfbf5;
+            --plastic-shadow-dark: #b8b6a5;
+            --btn-yellow: #ffc800;
+            --btn-shadow: #b38f00;
+            --led-red-on: #ff1a1a;
+            --led-red-off: #4a0000;
+        }
+
+        body {
+            background-color: #111;
+            /* REVISED BACKGROUND: Brighter grid, clearer vignette */
+            background-image: 
+                radial-gradient(circle at center, transparent 0%, #000 85%),
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            background-position: center center;
+            
+            font-family: 'VT323', monospace;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column; 
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* Prevent scroll, we scale instead */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Wrapper for scaling */
+        #scaler {
+            transform-origin: center center;
+            transition: transform 0.1s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        /* --- 3D Case --- */
+        .device-case {
+            background-color: var(--plastic-bg);
+            border-radius: 16px;
+            box-shadow: 
+                inset 2px 2px 4px rgba(255,255,255,0.7),
+                inset -4px -4px 8px rgba(0,0,0,0.15),
+                0 30px 60px rgba(0,0,0,0.8),
+                0 0 0 1px rgba(0,0,0,0.3); 
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            /* Fixed dimensions for consistent layout, handled by scaler */
+            width: 1100px;
+            height: 520px;
+        }
+        
+        .deco-line {
+            position: absolute;
+            height: 2px;
+            background: rgba(0,0,0,0.1);
+            left: 24px; right: 24px;
+        }
+
+        .panel-inset {
+            border: 2px solid rgba(0,0,0,0.08);
+            border-bottom-color: rgba(255,255,255,0.6);
+            border-right-color: rgba(255,255,255,0.6);
+            border-radius: 8px;
+            background: transparent;
+        }
+
+        .pixel-header {
+            font-size: 3.5rem;
+            color: #333;
+            text-align: center;
+            letter-spacing: 2px;
+            line-height: 1;
+            margin-bottom: 1.5rem;
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.4);
+        }
+        
+        .label-text {
+            font-size: 1.1rem;
+            color: #333;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        /* --- CONTROLS --- */
+        .btn-generate-base {
+            width: 110px; height: 110px;
+            background: #222;
+            border-radius: 50%;
+            padding: 6px;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn-generate {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            background: var(--btn-yellow);
+            border: none;
+            box-shadow: inset 3px 3px 6px rgba(255,255,255,0.6), inset -3px -3px 6px rgba(0,0,0,0.2);
+            cursor: pointer; transition: transform 0.05s;
+            touch-action: manipulation;
+        }
+        .btn-generate:active { transform: scale(0.96); }
+
+        .btn-octave {
+            width: 70px; height: 60px;
+            background: var(--btn-yellow);
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 6px;
+            box-shadow: 0 6px 0 var(--btn-shadow), 0 8px 6px rgba(0,0,0,0.2);
+            cursor: pointer; display: flex; justify-content: center; align-items: center;
+            transition: transform 0.1s, box-shadow 0.1s;
+            touch-action: manipulation;
+        }
+        .btn-octave:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 var(--btn-shadow), inset 1px 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .switch-housing {
+            width: 50px; height: 100px;
+            background: #dcdace;
+            border-radius: 4px;
+            box-shadow: inset 1px 1px 4px rgba(0,0,0,0.2);
+            position: relative; cursor: pointer;
+            touch-action: manipulation;
+        }
+        .switch-handle {
+            width: 40px; height: 40px;
+            background: #f8f8f4;
+            border-radius: 2px;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.2), inset 1px 1px 2px #fff;
+            position: absolute; left: 5px;
+            transition: top 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+            background-image: linear-gradient(to bottom, transparent 30%, #ddd 30%, #ddd 70%, transparent 70%);
+            background-size: 100% 10px;
+        }
+
+        /* --- FADERS & INPUTS --- */
+        .fader-track {
+            width: 12px; height: 100%;
+            background: #111;
+            border-radius: 6px;
+            position: relative;
+            box-shadow: inset 1px 1px 3px #000;
+        }
+        .fader-cap {
+            width: 44px; height: 24px;
+            background: #1a1a1a;
+            border-top: 1px solid #444; border-bottom: 2px solid #000;
+            position: absolute; left: 50%;
+            transform: translateX(-50%) translateZ(0); 
+            border-radius: 3px;
+            box-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            pointer-events: none;
+            will-change: bottom;
+        }
+        .fader-cap::after {
+            content: ''; position: absolute; top: 45%; left: 4px; right: 4px; height: 2px;
+            background: #fff; opacity: 0.9;
+        }
+
+        input[type=range][orient=vertical] {
+            writing-mode: bt-lr; 
+            -webkit-appearance: slider-vertical;
+            width: 100%; height: 100%;
+            opacity: 0; margin: 0; padding: 0;
+            cursor: ns-resize;
+            position: absolute; inset: 0; z-index: 20;
+            touch-action: none; /* CRITICAL FOR MOBILE: Prevents scrolling while dragging */
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px; width: 44px; background: transparent; border: none; box-shadow: none;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 24px; width: 44px; background: transparent; border: none;
+        }
+
+        .led-segment {
+            width: 8px; height: 4px;
+            background: var(--led-red-off);
+            margin-bottom: 4px; border-radius: 1px;
+            transition: background-color 0.05s;
+        }
+        .led-segment.on {
+            background: var(--led-red-on);
+            box-shadow: 0 0 5px var(--led-red-on);
+        }
+
+        .knob-container { width: 60px; height: 60px; position: relative; }
+        .knob-body {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #2a2a2a, #111);
+            border: 2px solid #000;
+            box-shadow: 4px 4px 8px rgba(0,0,0,0.4);
+            transform: rotate(-135deg) translateZ(0);
+            will-change: transform;
+        }
+        .knob-indicator {
+            position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+            width: 4px; height: 18px; background: #fff; border-radius: 2px;
+        }
+
+        /* --- Portrait Warning Overlay --- */
+        #rotate-message {
+            display: none;
+            position: fixed; inset: 0; z-index: 100;
+            background: #111; color: var(--btn-yellow);
+            flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 2rem;
+        }
+        #rotate-message svg { width: 64px; height: 64px; margin-bottom: 1rem; animation: spin 2s infinite; }
+        
+        /* Only show if we are on a coarse pointer device (touch) AND in portrait */
+        @media (pointer: coarse) and (orientation: portrait) {
+            #rotate-message { display: flex; }
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 25% { transform: rotate(-90deg); } 100% { transform: rotate(-90deg); } }
+
+    </style>
+</head>
+<body>
+
+    <!-- Portrait Warning -->
+    <div id="rotate-message">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v12H4z" opacity=".3"/><path d="M16 2H8C6.9 2 6 2.9 6 4v16c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 18h-4v-1h4v1zm2-3H8V5h8v12z"/></svg>
+        <h2 class="text-3xl font-bold mb-2">PLEASE ROTATE DEVICE</h2>
+        <p class="text-gray-400">This synth requires landscape mode.</p>
+    </div>
+
+    <div id="start-modal" class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
+        <div class="text-center">
+            <h1 class="text-white text-6xl mb-6 font-bold tracking-widest text-[#ffc800] font-[VT323]">THE FAN BASS BUILDER</h1>
+            <button id="init-btn" class="bg-[#ffc800] hover:bg-yellow-400 text-black font-bold py-6 px-12 rounded-xl text-3xl shadow-lg border-b-8 border-[#b38f00] active:border-b-0 active:translate-y-2 font-[VT323] transition-all">
+                POWER ON
+            </button>
+        </div>
+    </div>
+
+    <!-- Scaler Wrapper handles responsiveness -->
+    <div id="scaler">
+        <div class="device-case">
+            <div class="deco-line top-6 opacity-40"></div>
+            <div class="deco-line bottom-6 opacity-40"></div>
+            <h1 class="pixel-header">THE FAN BASS BUILDER</h1>
+
+            <div class="flex flex-1 gap-6 px-4 pb-4">
+                
+                <!-- Left Panel -->
+                <div class="w-[25%] flex flex-col items-center justify-between py-2 panel-inset">
+                    <div class="flex flex-col items-center gap-2 mt-4">
+                        <div class="btn-generate-base">
+                            <button id="btn-generate" class="btn-generate"></button>
+                        </div>
+                        <span class="label-text mt-2">GENERATE<br>PATTERN</span>
+                    </div>
+                    <div class="flex gap-6 mb-4">
+                        <div class="flex flex-col items-center gap-1">
+                            <button id="btn-oct-up" class="btn-octave">
+                                <div style="width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 15px solid #222;"></div>
+                            </button>
+                            <span class="label-text text-sm">OCT UP</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-1">
+                            <button id="btn-oct-down" class="btn-octave">
+                                <div style="width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 15px solid #222;"></div>
+                            </button>
+                            <span class="label-text text-sm">OCT DOWN</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle Panel -->
+                <div class="w-[12%] flex flex-col items-center justify-center gap-6 panel-inset">
+                    <span class="label-text text-xl">SAW</span>
+                    <div class="switch-housing" id="waveform-switch">
+                        <div class="absolute left-1/2 top-2 bottom-2 w-1 bg-black/10 -translate-x-1/2 rounded"></div>
+                        <div id="switch-handle" class="switch-handle" style="top: 5px;"></div>
+                    </div>
+                    <span class="label-text text-xl">SQR</span>
+                    <span class="label-text text-sm mt-2 opacity-60">WAVEFORM</span>
+                </div>
+
+                <!-- Right Panel -->
+                <div class="w-[63%] flex panel-inset px-6 py-4 gap-8">
+                    
+                    <!-- Faders -->
+                    <div class="flex-1 flex justify-between h-full">
+                        
+                        <div class="h-full w-[30%] relative flex flex-col items-center">
+                            <div class="relative w-full flex-1 flex justify-center mb-2">
+                                <div id="leds-cutoff" class="absolute left-0 top-2 bottom-2 w-2 flex flex-col-reverse justify-between"></div>
+                                <div class="fader-track"></div>
+                                <div id="cap-cutoff" class="fader-cap"></div>
+                                <input type="range" id="slider-cutoff" min="100" max="10000" step="1" value="2000" orient="vertical">
+                            </div>
+                            <span class="label-text leading-tight">FILTER<br>CUTOFF</span>
+                        </div>
+
+                        <div class="h-full w-[30%] relative flex flex-col items-center">
+                            <div class="relative w-full flex-1 flex justify-center mb-2">
+                                <div id="leds-res" class="absolute left-0 top-2 bottom-2 w-2 flex flex-col-reverse justify-between"></div>
+                                <div class="fader-track"></div>
+                                <div id="cap-res" class="fader-cap"></div>
+                                <input type="range" id="slider-res" min="0" max="20" step="0.01" value="8" orient="vertical">
+                            </div>
+                            <span class="label-text">RESONANCE</span>
+                        </div>
+
+                        <div class="h-full w-[30%] relative flex flex-col items-center">
+                            <div class="relative w-full flex-1 flex justify-center mb-2">
+                                <div id="leds-env" class="absolute left-0 top-2 bottom-2 w-2 flex flex-col-reverse justify-between"></div>
+                                <div class="fader-track"></div>
+                                <div id="cap-env" class="fader-cap"></div>
+                                <input type="range" id="slider-env" min="0" max="7" step="0.01" value="4" orient="vertical">
+                            </div>
+                            <span class="label-text">ENV MOD</span>
+                        </div>
+                    </div>
+
+                    <div class="w-[2px] h-full bg-black/10"></div>
+
+                    <!-- Knobs -->
+                    <div class="w-[20%] flex flex-col justify-between items-center py-1">
+                        <div class="flex flex-col items-center gap-1">
+                            <div class="knob-container">
+                                <div id="knob-dist" class="knob-body"><div class="knob-indicator"></div></div>
+                                <input type="range" id="slider-dist" min="0" max="1" step="0.001" value="0.4" orient="vertical">
+                            </div>
+                            <span class="label-text text-sm">DRIVE</span>
+                        </div>
+
+                        <div class="flex flex-col items-center gap-1">
+                            <div class="knob-container">
+                                <div id="knob-echo" class="knob-body"><div class="knob-indicator"></div></div>
+                                <input type="range" id="slider-echo" min="0" max="1" step="0.001" value="0.2" orient="vertical">
+                            </div>
+                            <span class="label-text text-sm">ECHO</span>
+                        </div>
+
+                        <div class="flex flex-col items-center gap-1">
+                            <div class="knob-container">
+                                <div id="knob-space" class="knob-body"><div class="knob-indicator"></div></div>
+                                <input type="range" id="slider-space" min="0" max="1" step="0.001" value="0.1" orient="vertical">
+                            </div>
+                            <span class="label-text text-sm">SPACE</span>
+                        </div>
+
+                        <div class="flex flex-col items-center gap-1">
+                            <div class="bg-black/90 text-[#ff1a1a] px-2 rounded text-xs font-mono mb-1 border border-gray-600">
+                                <span id="bpm-display">125</span>
+                            </div>
+                            <div class="knob-container">
+                                <div id="knob-bpm" class="knob-body"><div class="knob-indicator"></div></div>
+                                <input type="range" id="slider-bpm" min="60" max="200" step="1" value="125" orient="vertical">
+                            </div>
+                            <span class="label-text text-sm">TEMPO</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Link -->
+        <div class="text-center mt-4">
+            <a href="https://newsletter.thefanbasebuilder.co/p/i-created-a-synth-with-ai" target="_blank" class="text-gray-500 text-lg tracking-[0.2em] border-b border-gray-700 hover:text-gray-300 hover:border-gray-300 pb-1 transition-colors">
+                LEARN MORE ABOUT THIS SYNTH
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            isPlaying: false, bpm: 125, waveform: 'sawtooth', octaveOffset: 0, pattern: [],
+            params: { cutoff: 2000, resonance: 8, envMod: 4, distortion: 0.4, echo: 0.2, space: 0.1 }
+        };
+
+        // --- Window Scaling Logic ---
+        function handleResize() {
+            const scaler = document.getElementById('scaler');
+            const targetWidth = 1200; // Case width + margins
+            const targetHeight = 800; // Case height + margins
+            
+            const scaleX = window.innerWidth / targetWidth;
+            const scaleY = window.innerHeight / targetHeight;
+            
+            // Choose the smaller scale to fit everything on screen
+            // Don't scale up past 1 (pixelation) unless specifically desired
+            let scale = Math.min(scaleX, scaleY);
+            if (scale > 1.2) scale = 1.2; 
+            
+            scaler.style.transform = `scale(${scale})`;
+        }
+        
+        window.addEventListener('resize', handleResize);
+        // Call immediately
+        handleResize();
+
+        function updateVisuals(id, value, min, max, type = 'slider') {
+            const range = max - min;
+            const percent = (value - min) / range;
+            
+            if (type === 'slider') {
+                const cap = document.getElementById(`cap-${id}`);
+                if(cap) {
+                    const capHeight = 24; 
+                    cap.style.bottom = `calc(${percent * 100}% - ${percent * capHeight}px)`;
+                }
+                
+                const ledContainer = document.getElementById(`leds-${id}`);
+                if (ledContainer) {
+                    const leds = ledContainer.children;
+                    const totalLeds = leds.length;
+                    const litCount = Math.ceil(percent * totalLeds);
+                    const currentLit = parseInt(ledContainer.dataset.lit || -1);
+                    
+                    if (currentLit !== litCount) {
+                        for (let i = 0; i < totalLeds; i++) {
+                            if (i < litCount) { if (!leds[i].classList.contains('on')) leds[i].classList.add('on'); } 
+                            else { if (leds[i].classList.contains('on')) leds[i].classList.remove('on'); }
+                        }
+                        ledContainer.dataset.lit = litCount;
+                    }
+                }
+            } else if (type === 'knob') {
+                const knob = document.getElementById(`knob-${id}`);
+                if(knob) {
+                    const deg = (percent * 270) - 135;
+                    knob.style.transform = `rotate(${deg}deg) translateZ(0)`;
+                }
+            }
+        }
+
+        function createLEDs(containerId, count) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const led = document.createElement('div');
+                led.className = 'led-segment';
+                container.appendChild(led);
+            }
+        }
+
+        let synth, distortion, echo, space, vol, seq;
+        const NOTES = ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb']; 
+
+        async function initAudio() {
+            if (Tone.context.state !== 'running') await Tone.start();
+            vol = new Tone.Volume(-6).toDestination();
+            space = new Tone.Reverb({ decay: 4, wet: state.params.space }).connect(vol);
+            await space.generate();
+            echo = new Tone.PingPongDelay({ delayTime: "8n.", feedback: 0.4, wet: state.params.echo }).connect(space);
+            distortion = new Tone.Distortion(state.params.distortion).connect(echo);
+            synth = new Tone.MonoSynth({
+                oscillator: { type: state.waveform },
+                portamento: 0.05, 
+                envelope: { attack: 0.005, decay: 0.3, sustain: 0.1, release: 0.5 },
+                filterEnvelope: { attack: 0.001, decay: 0.2, sustain: 0.0, baseFrequency: state.params.cutoff, octaves: state.params.envMod, exponent: 2 }
+            }).connect(distortion);
+            synth.filter.type = "lowpass"; synth.filter.rolloff = -24; synth.filter.Q.value = state.params.resonance;
+            generatePattern(); 
+            Tone.Transport.bpm.value = state.bpm;
+            Tone.Transport.start();
+        }
+
+        function generatePattern() {
+            const length = 16;
+            const newPattern = [];
+            const rootOctave = 2 + state.octaveOffset;
+            for(let i=0; i<length; i++) {
+                if (Math.random() > 0.25) {
+                    const noteName = NOTES[Math.floor(Math.random() * NOTES.length)];
+                    let oct = rootOctave;
+                    const r = Math.random();
+                    if(r > 0.8) oct += 1; else if(r < 0.05) oct -= 1;
+                    const isAccent = Math.random() > 0.7;
+                    const velocity = isAccent ? 1.0 : 0.6; 
+                    const isSlide = Math.random() > 0.75;
+                    const duration = isSlide ? "16n" : "32n"; 
+                    newPattern.push({ note: `${noteName}${oct}`, velocity: velocity, duration: duration, isSlide: isSlide });
+                } else { newPattern.push(null); }
+            }
+            state.pattern = newPattern;
+            updateSequencer();
+        }
+
+        function updateSequencer() {
+            if (seq) seq.dispose();
+            seq = new Tone.Sequence((time, event) => {
+                if (event) {
+                    synth.triggerAttackRelease(event.note, event.duration, time, event.velocity);
+                    const btn = document.getElementById('btn-generate');
+                    btn.style.backgroundColor = event.velocity > 0.8 ? '#fff' : 'var(--btn-yellow)';
+                    setTimeout(() => btn.style.backgroundColor = 'var(--btn-yellow)', 100);
+                }
+            }, state.pattern, "16n").start(0);
+        }
+
+        function changeOctave(delta) {
+            const newOffset = state.octaveOffset + delta;
+            if (newOffset > 2 || newOffset < -2) return;
+            state.octaveOffset = newOffset;
+            state.pattern.forEach(step => {
+                if (step && step.note) {
+                    const match = step.note.match(/^([A-Ga-g#b]+)(-?\d+)$/);
+                    if (match) { step.note = `${match[1]}${parseInt(match[2]) + delta}`; }
+                }
+            });
+            updateSequencer(); 
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            createLEDs('leds-cutoff', 25); createLEDs('leds-res', 25); createLEDs('leds-env', 25);
+
+            document.getElementById('init-btn').addEventListener('click', async () => {
+                await initAudio();
+                document.getElementById('start-modal').style.display = 'none';
+                state.isPlaying = true;
+            });
+
+            const setupControl = (id, param, min, max, type, action) => {
+                const input = document.getElementById(`slider-${id}`);
+                const update = () => {
+                    const val = parseFloat(input.value);
+                    if (id === 'bpm') state.bpm = val; else state.params[param] = val;
+                    if (synth || id === 'bpm') action(val);
+                    updateVisuals(id, val, min, max, type);
+                };
+                input.addEventListener('input', update);
+                update();
+            };
+
+            setupControl('cutoff', 'cutoff', 100, 10000, 'slider', val => synth.filterEnvelope.baseFrequency = val);
+            setupControl('res', 'resonance', 0, 20, 'slider', val => synth.filter.Q.value = val);
+            setupControl('env', 'envMod', 0, 7, 'slider', val => synth.filterEnvelope.octaves = val);
+
+            setupControl('dist', 'distortion', 0, 1, 'knob', val => distortion.distortion = val);
+            setupControl('echo', 'echo', 0, 1, 'knob', val => echo.wet.value = val);
+            setupControl('space', 'space', 0, 1, 'knob', val => space.wet.value = val);
+            setupControl('bpm', 'bpm', 60, 200, 'knob', val => {
+                Tone.Transport.bpm.value = val;
+                document.getElementById('bpm-display').innerText = Math.round(val);
+            });
+
+            document.getElementById('btn-generate').addEventListener('click', () => { if(Tone.context.state === 'running') generatePattern(); });
+            document.getElementById('btn-oct-up').addEventListener('click', () => changeOctave(1));
+            document.getElementById('btn-oct-down').addEventListener('click', () => changeOctave(-1));
+
+            const waveSwitch = document.getElementById('waveform-switch');
+            const switchHandle = document.getElementById('switch-handle');
+            waveSwitch.addEventListener('click', () => {
+                if(state.waveform === 'sawtooth') { state.waveform = 'square'; switchHandle.style.top = '55px'; }
+                else { state.waveform = 'sawtooth'; switchHandle.style.top = '5px'; }
+                if(synth) synth.oscillator.type = state.waveform;
+            });
+        });
+    </script>
+</body>
+</html>
